@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 
 #include <cstring>
+#include <functional>
 #include <iostream>
 #include <vector>
 
@@ -387,8 +388,12 @@ void Renderer::update_instances(const core::GridBuffer &grid,
       theme::Color fg = cell.foreground;
       theme::Color bg = cell.background;
 
+      // Selection: invert colors (check before cursor)
+      if (selection_check_ && selection_check_(col, row)) {
+        std::swap(fg, bg);
+      }
       // Cursor: invert colors
-      if (show_cursor && col == cursor_col && row == cursor_row) {
+      else if (show_cursor && col == cursor_col && row == cursor_row) {
         std::swap(fg, bg);
       }
 

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace tide::core {
@@ -107,6 +108,52 @@ public:
    */
   [[nodiscard]] const Cell *get_visible_row(int visual_row) const;
 
+  // Selection interface
+  struct Selection {
+    int start_col = 0, start_row = 0;
+    int end_col = 0, end_row = 0;
+    bool active = false;
+
+    // Normalize so start <= end
+    void normalize() {
+      if (start_row > end_row ||
+          (start_row == end_row && start_col > end_col)) {
+        std::swap(start_col, end_col);
+        std::swap(start_row, end_row);
+      }
+    }
+  };
+
+  /**
+   * Start a new selection at given position.
+   */
+  void start_selection(int col, int row);
+
+  /**
+   * Update selection end position.
+   */
+  void update_selection(int col, int row);
+
+  /**
+   * Clear current selection.
+   */
+  void clear_selection();
+
+  /**
+   * Get current selection.
+   */
+  [[nodiscard]] const Selection &selection() const { return selection_; }
+
+  /**
+   * Check if a cell is selected.
+   */
+  [[nodiscard]] bool is_selected(int col, int row) const;
+
+  /**
+   * Get selected text.
+   */
+  [[nodiscard]] std::string get_selected_text() const;
+
 private:
   // Parser state machine
   enum class State {
@@ -132,6 +179,9 @@ private:
   static constexpr int MAX_SCROLLBACK = 10000;
   std::vector<std::vector<Cell>> scrollback_;
   int scroll_offset_ = 0; // 0 = at bottom (live view)
+
+  // Selection
+  Selection selection_;
 
   // CSI parameter collection
   static constexpr int MAX_PARAMS = 16;

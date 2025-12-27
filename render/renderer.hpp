@@ -5,6 +5,7 @@
 #include "theme/theme.hpp"
 
 #include <cstdint>
+#include <functional>
 
 namespace tide::render {
 
@@ -64,12 +65,21 @@ public:
   [[nodiscard]] int grid_cols() const;
   [[nodiscard]] int grid_rows() const;
 
+  // Selection callback type
+  using SelectionCheck = std::function<bool(int col, int row)>;
+
+  /**
+   * Set selection check function for highlighting.
+   */
+  void set_selection_check(SelectionCheck check) { selection_check_ = check; }
+
 private:
   Font *font_ = nullptr;
   int viewport_width_ = 0;
   int viewport_height_ = 0;
   theme::Theme current_theme_;
   bool initialized_ = false;
+  SelectionCheck selection_check_ = nullptr;
 
   // OpenGL resources
   uint32_t shader_program_ = 0;

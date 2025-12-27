@@ -711,4 +711,93 @@ const Cell *Terminal::get_visible_row(int visual_row) const {
   }
 }
 
+// Selection methods
+void Terminal::start_selection(int col, int row) {
+  selection_.start_col = col;
+  selection_.start_row = row;
+  selection_.end_col = col;
+  selection_.end_row = row;
+  selection_.active = true;
+}
+
+void Terminal::update_selection(int col, int row) {
+  if (!selection_.active)
+    return;
+  selection_.end_col = col;
+  selection_.end_row = row;
+}
+
+void Terminal::clear_selection() {
+  selection_.active = false;
+  selection_.start_col = selection_.start_row = 0;
+  selection_.end_col = selection_.end_row = 0;
+}
+
+bool Terminal::is_selected(int col, int row) const {
+  if (!selection_.active)
+    return false;
+
+  Selection sel = selection_;
+  sel.normalize();
+
+  // Check if row is within selection range
+  if (row < sel.start_row || row > sel.end_row)
+    return false;
+
+  if (sel.start_row == sel.end_row) {
+    // Single line selection
+    return col >= sel.start_col && col <= sel.end_col;
+  }
+
+  if (row == sel.start_row) {
+    // First line: from start_col to end of line
+    return col >= sel.start_col;
+  }
+
+  if (row == sel.end_row) {
+    // Last line: from start to end_col
+    return col <= sel.end_col;
+  }
+
+  // Middle lines: fully selected
+  return true;
+}
+
+std::string Terminal::get_selected_text() const {
+  if (!selection_.active)
+    return "";
+
+  Selection sel = selection_;
+  sel.normalize();
+
+  std::string result;
+  int cols = grid_.cols();
+
+  for (int row = sel.start_row; row <= sel.end_row; ++row) {
+    int start_col = (row == sel.start_row) ? sel.start_col : 0;
+    int end_col = (row == sel.end_row) ? sel.end_col : cols - 1;
+
+    for (int col = start_col; col <= end_col; ++col) {
+      const Cell &cell = grid_.at(col, row);
+      // Simple ASCII conversion for now
+      if (cell.codepoint < 128 && cell.codepoint >= 32) {
+        result += static_cast<char>(cell.codepoint);
+      } else if (cell.codepoint == U' ' || cell.codepoint == 0) {
+        result += ' ';
+      }
+    }
+
+    // Add newline between lines (but not after last)
+    if (row < sel.end_row) {
+      // Trim trailing spaces before newline
+      while (!result.empty() && result.back() == ' ') {
+        result.pop_back();
+      }
+      result += '\n';
+    }
+  }
+
+  return result;
+}
+
 } // namespace tide::core

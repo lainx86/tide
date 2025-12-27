@@ -11,6 +11,9 @@
 #include "render/renderer.hpp"
 #include "theme/theme.hpp"
 
+#include <GLFW/glfw3.h>
+
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <iostream>
@@ -117,6 +120,51 @@ int main(int argc, char *argv[]) {
       pty.resize(new_cols, new_rows);
       std::cout << "[tide] Resized to: " << new_cols << "x" << new_rows
                 << std::endl;
+    }
+  });
+
+  // Mouse state for selection
+  bool mouse_selecting = false;
+  double last_mouse_x = 0, last_mouse_y = 0;
+
+  // Helper to convert mouse coords to cell position
+  auto mouse_to_cell = [&](double x, double y, int &col, int &row) {
+    col = static_cast<int>(x) / font.cell_width();
+    row = static_cast<int>(y) / font.cell_height();
+    col = std::clamp(col, 0, terminal.cols() - 1);
+    row = std::clamp(row, 0, terminal.rows() - 1);
+  };
+
+  // Set up mouse button callback for selection
+  window.mouse().set_button_callback([&](int button, int action, int mods) {
+    (void)mods;
+    if (button == 0) {   // Left button
+      if (action == 1) { // Press
+        int col, row;
+        mouse_to_cell(last_mouse_x, last_mouse_y, col, row);
+        terminal.start_selection(col, row);
+        mouse_selecting = true;
+      } else if (action == 0) { // Release
+        if (mouse_selecting && terminal.selection().active) {
+          // Copy to clipboard
+          std::string text = terminal.get_selected_text();
+          if (!text.empty()) {
+            glfwSetClipboardString(nullptr, text.c_str());
+          }
+        }
+        mouse_selecting = false;
+      }
+    }
+  });
+
+  // Set up mouse motion callback
+  window.mouse().set_move_callback([&](double x, double y) {
+    last_mouse_x = x;
+    last_mouse_y = y;
+    if (mouse_selecting) {
+      int col, row;
+      mouse_to_cell(x, y, col, row);
+      terminal.update_selection(col, row);
     }
   });
 
@@ -261,6 +309,10 @@ int main(int argc, char *argv[]) {
 
     // Hide cursor if scrolled into history
     bool show_cursor = cursor_visible && !terminal.is_scrolled();
+
+    // Set selection check for highlighting
+    renderer.set_selection_check(
+        [&](int col, int row) { return terminal.is_selected(col, row); });
 
     // Render frame with cursor
     renderer.render(terminal.grid(), theme, terminal.cursor_col(),

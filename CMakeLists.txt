@@ -41,6 +41,7 @@ set(CORE_SOURCES
     core/pty.cpp
     core/ansi_parser.cpp
     core/grid_buffer.cpp
+    core/terminal.cpp
 )
 
 set(RENDER_SOURCES

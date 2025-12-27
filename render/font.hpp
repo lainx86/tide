@@ -1,18 +1,30 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
+#include <unordered_map>
+
+// Forward declarations for FreeType
+typedef struct FT_LibraryRec_ *FT_Library;
+typedef struct FT_FaceRec_ *FT_Face;
 
 namespace tide::render {
 
 /**
+ * Information about a single glyph in the atlas.
+ */
+struct GlyphInfo {
+  float tex_x0, tex_y0; // Top-left texture coordinates (normalized)
+  float tex_x1, tex_y1; // Bottom-right texture coordinates (normalized)
+  int width, height;    // Glyph bitmap dimensions
+  int bearing_x;        // Offset from cursor to left edge
+  int bearing_y;        // Offset from baseline to top edge
+  int advance;          // Horizontal advance to next glyph
+};
+
+/**
  * Font manager for loading and rendering glyphs using FreeType.
- *
- * TODO: Implement font rendering:
- * - Load TTF/OTF fonts via FreeType
- * - Generate glyph atlas texture
- * - Handle glyph metrics for proper spacing
- * - Support font fallback chains for missing glyphs
- * - Handle DPI scaling
+ * Generates a glyph atlas texture for efficient OpenGL rendering.
  */
 class Font {
 public:
@@ -35,14 +47,29 @@ public:
   void shutdown();
 
   /**
-   * Load a font from file.
+   * Load a font from file and generate glyph atlas.
    * @param path Path to TTF/OTF font file
-   * @param size_pt Font size in points
+   * @param size_px Font size in pixels
    * @return true if font loaded successfully
-   *
-   * TODO: Implement actual font loading
    */
-  bool load(const std::string &path, int size_pt);
+  bool load(const std::string &path, int size_px);
+
+  /**
+   * Get glyph info for a codepoint.
+   * Returns info for '?' if glyph not found.
+   */
+  [[nodiscard]] const GlyphInfo &get_glyph(char32_t codepoint) const;
+
+  /**
+   * Get the OpenGL texture ID of the glyph atlas.
+   */
+  [[nodiscard]] uint32_t atlas_texture() const { return atlas_texture_; }
+
+  /**
+   * Get atlas dimensions.
+   */
+  [[nodiscard]] int atlas_width() const { return atlas_width_; }
+  [[nodiscard]] int atlas_height() const { return atlas_height_; }
 
   /**
    * Get the width of a single cell in pixels.
@@ -52,29 +79,46 @@ public:
 
   /**
    * Get the height of a single cell in pixels.
-   * This is typically the line height (ascent + descent + line gap).
    */
   [[nodiscard]] int cell_height() const { return cell_height_; }
+
+  /**
+   * Get baseline offset from top of cell.
+   */
+  [[nodiscard]] int baseline() const { return baseline_; }
 
   /**
    * Check if font is loaded and ready.
    */
   [[nodiscard]] bool is_loaded() const { return loaded_; }
 
-  // TODO: Add glyph rendering methods
-  // void render_glyph(char32_t codepoint, float x, float y);
-  // GLuint get_atlas_texture() const;
-
 private:
   bool loaded_ = false;
-  int cell_width_ = 10;  // Placeholder default
-  int cell_height_ = 20; // Placeholder default
 
-  // TODO: Add FreeType resources
-  // FT_Library ft_library_;
-  // FT_Face ft_face_;
-  // GLuint atlas_texture_;
-  // std::unordered_map<char32_t, GlyphInfo> glyph_cache_;
+  // FreeType handles
+  FT_Library ft_library_ = nullptr;
+  FT_Face ft_face_ = nullptr;
+
+  // Atlas texture
+  uint32_t atlas_texture_ = 0;
+  int atlas_width_ = 0;
+  int atlas_height_ = 0;
+
+  // Font metrics
+  int cell_width_ = 0;
+  int cell_height_ = 0;
+  int baseline_ = 0;
+  int ascent_ = 0;
+  int descent_ = 0;
+
+  // Glyph cache
+  std::unordered_map<char32_t, GlyphInfo> glyphs_;
+  GlyphInfo fallback_glyph_;
+
+  /**
+   * Generate glyph atlas from loaded font face.
+   */
+  bool generate_atlas();
 };
 
 } // namespace tide::render
